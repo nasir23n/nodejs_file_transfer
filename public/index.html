@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Transfer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl">
+    <h1 class="text-2xl font-bold mb-4">
+        You are <span class="text-red-500" id="youAre"></span>
+    </h1>
+    <form id="uploadForm" class="flex flex-col space-y-4">
+      <input type="file" id="fileInput" name="files" multiple class="border p-2 rounded">
+      <label for="deviceSelect" class="mt-2">Select Device:</label>
+      <select id="deviceSelect" class="border p-2 rounded">
+        <option value="" disabled selected>Select a device</option>
+      </select>
+      <button type="submit" id="uploadButton" class="bg-blue-500 text-white p-2 rounded flex items-center justify-center">
+        <span id="buttonText">Upload</span>
+        <svg id="loader" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </button>
+    </form>
+    <div id="progressContainer" class="mt-4"></div>
+    <div id="fileList" class="mt-4"></div>
+  </div>
+  <script>
+    const socket = io('http://192.168.0.102:3000');
+    const deviceSelect = document.getElementById('deviceSelect');
+    let currentDeviceId = '';
+
+    document.getElementById('uploadForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      const fileInput = document.getElementById('fileInput');
+      const selectedDevice = deviceSelect.value;
+      const uploadButton = document.getElementById('uploadButton');
+      const buttonText = document.getElementById('buttonText');
+      const loader = document.getElementById('loader');
+
+      if (!fileInput.files.length || !selectedDevice) {
+        alert("No file selected or no device selected");
+        return;
+      }
+
+      buttonText.classList.add('hidden');
+      loader.classList.remove('hidden');
+
+      const formData = new FormData();
+      Array.from(fileInput.files).forEach(file => {
+        formData.append('files', file);
+      });
+      formData.append('deviceId', selectedDevice);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/upload', true);
+
+      xhr.upload.onprogress = function(event) {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          updateProgress(selectedDevice, percentComplete);
+        }
+      };
+
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          notifyDevice(selectedDevice, response);
+        } else {
+          console.error('Error uploading file:', xhr.statusText);
+        }
+        resetForm();
+      };
+
+      xhr.send(formData);
+    });
+
+    socket.on('updateDevices', (devices) => {
+      deviceSelect.innerHTML = '<option value="" disabled selected>Select a device</option>';
+
+      const currentDeviceOption = document.createElement('option');
+      currentDeviceOption.value = currentDeviceId;
+      currentDeviceOption.textContent = localStorage.deviceName || 'Your Device';
+      currentDeviceOption.disabled = true;
+      deviceSelect.appendChild(currentDeviceOption);
+
+      document.getElementById('youAre').innerHTML = `(${currentDeviceOption.textContent})`
+
+      devices.forEach(device => {
+        if (device.id !== currentDeviceId) {
+          const option = document.createElement('option');
+          option.value = device.id;
+          option.textContent = device.name;
+          deviceSelect.appendChild(option);
+        }
+      });
+    });
+
+    socket.on('filesReceived', (files) => {
+      files.forEach(file => {
+        downloadFile(file);
+      });
+    });
+
+    function updateProgress(deviceId, percent) {
+      const progressContainer = document.getElementById('progressContainer');
+      let progressBar = document.getElementById(`progress-${deviceId}`);
+      if (!progressBar) {
+        progressBar = document.createElement('div');
+        progressBar.id = `progress-${deviceId}`;
+        progressBar.className = 'overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200';
+        progressBar.innerHTML = `<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500" style="width: ${percent}%"></div>`;
+        progressContainer.appendChild(progressBar);
+      } else {
+        progressBar.firstChild.style.width = `${percent}%`;
+      }
+    }
+
+    function notifyDevice(deviceId, files) {
+      socket.emit('notifyDevice', { deviceId, files });
+    }
+
+    function resetForm() {
+      const fileInput = document.getElementById('fileInput');
+      const buttonText = document.getElementById('buttonText');
+      const loader = document.getElementById('loader');
+      buttonText.classList.remove('hidden');
+      loader.classList.add('hidden');
+      fileInput.value = '';
+    }
+
+    function downloadFile(file) {
+      const fileList = document.getElementById('fileList');
+      const fileLink = document.createElement('a');
+      fileLink.href = file.path;
+      fileLink.download = file.filename;
+      fileLink.textContent = `Download ${file.filename}`;
+      fileLink.className = 'block p-2 bg-gray-200 rounded mt-2';
+      fileList.appendChild(fileLink);
+      fileLink.click();
+    }
+
+    const deviceName = localStorage.getItem('deviceName') || prompt("Enter your device name:");
+    localStorage.setItem('deviceName', deviceName);
+    socket.emit('registerDevice', deviceName);
+    socket.on('connect', () => {
+      currentDeviceId = socket.id;
+    });
+  </script>
+</body>
+</html>
