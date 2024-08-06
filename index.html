@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>File Upload</title>
+  <title>Multiple File Upload</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
   <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl">
-    <h1 class="text-2xl font-bold mb-4">Upload File</h1>
+    <h1 class="text-2xl font-bold mb-4">Upload Files</h1>
     <form id="uploadForm" class="flex flex-col space-y-4">
-      <input type="file" id="fileInput" name="file" class="border p-2 rounded">
+      <input type="file" id="fileInput" name="file" multiple class="border p-2 rounded">
       <button type="submit" id="uploadButton" class="bg-blue-500 text-white p-2 rounded flex items-center justify-center">
         <span id="buttonText">Upload</span>
         <svg id="loader" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -19,25 +19,7 @@
         </svg>
       </button>
     </form>
-    <div id="progressContainer" class="mt-4 hidden">
-      <div class="relative pt-1">
-        <div class="flex mb-2 items-center justify-between">
-          <div>
-            <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
-              Uploading
-            </span>
-          </div>
-          <div class="text-right">
-            <span class="text-xs font-semibold inline-block text-blue-600" id="progressText">
-              0%
-            </span>
-          </div>
-        </div>
-        <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
-          <div id="progressBar" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500" style="width: 0%;"></div>
-        </div>
-      </div>
-    </div>
+    <div id="progressContainer" class="mt-4"></div>
   </div>
   <script>
     document.getElementById('uploadForm').addEventListener('submit', function(event) {
@@ -48,87 +30,114 @@
       const loader = document.getElementById('loader');
 
       if (!fileInput.files.length) {
-        alert("No file selected");
+        alert("No files selected");
         return;
       }
 
-      const formData = new FormData();
-      formData.append('file', fileInput.files[0]);
+      buttonText.classList.add('hidden');
+      loader.classList.remove('hidden');
 
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://192.168.0.102:3000/upload', true);
+      Array.from(fileInput.files).forEach(file => {
+        const formData = new FormData();
+        formData.append('file', file);
 
-      xhr.upload.onprogress = function(event) {
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
-        progressContainer.classList.remove('hidden');
-        if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 100);
-          progressBar.style.width = percentComplete + '%';
-          progressText.textContent = percentComplete + '%';
-        }
-      };
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://192.168.0.102:3000/upload', true);
 
-      xhr.onloadstart = function() {
-        buttonText.classList.add('hidden');
-        loader.classList.remove('hidden');
-      };
+        const progressContainer = document.createElement('div');
+        progressContainer.className = 'mt-4';
 
-      xhr.onloadend = function() {
-        buttonText.classList.remove('hidden');
-        loader.classList.add('hidden');
-      };
+        const progressBarContainer = document.createElement('div');
+        progressBarContainer.className = 'relative pt-1';
 
-      xhr.onload = function() {
-        if (xhr.status === 200) {
-          const response = JSON.parse(xhr.responseText);
-          const file = document.createElement('div');
-          file.className = 'p-2 bg-gray-200 rounded';
-          
-          if (fileInput.files[0].type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = response.filePath;
-            img.className = 'w-full h-auto rounded';
-            file.appendChild(img);
-          } else if (fileInput.files[0].type.startsWith('video/')) {
-            const video = document.createElement('video');
-            video.controls = true;
-            video.className = 'w-full h-auto rounded';
-            const source = document.createElement('source');
-            source.src = response.filePath;
-            source.type = fileInput.files[0].type;
-            video.appendChild(source);
-            file.appendChild(video);
-          } else if (fileInput.files[0].type.startsWith('audio/')) {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.className = 'w-full h-auto rounded';
-            const source = document.createElement('source');
-            source.src = response.filePath;
-            source.type = fileInput.files[0].type;
-            audio.appendChild(source);
-            file.appendChild(audio);
-          } else {
-            const placeholder = document.createElement('div');
-            placeholder.className = 'flex items-center justify-center h-full w-full bg-gray-300 rounded';
-            const span = document.createElement('span');
-            span.className = 'text-gray-700';
-            span.textContent = 'Preview not available';
-            placeholder.appendChild(span);
-            file.appendChild(placeholder);
+        const progressBarTextContainer = document.createElement('div');
+        progressBarTextContainer.className = 'flex mb-2 items-center justify-between';
+
+        const progressBarText = document.createElement('span');
+        progressBarText.className = 'text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200';
+        progressBarText.textContent = 'Uploading';
+
+        const progressBarPercent = document.createElement('span');
+        progressBarPercent.className = 'text-xs font-semibold inline-block text-blue-600';
+        progressBarPercent.textContent = '0%';
+
+        progressBarTextContainer.appendChild(progressBarText);
+        progressBarTextContainer.appendChild(progressBarPercent);
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200';
+
+        const progressBarFill = document.createElement('div');
+        progressBarFill.className = 'shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500';
+        progressBarFill.style.width = '0%';
+
+        progressBar.appendChild(progressBarFill);
+        progressBarContainer.appendChild(progressBarTextContainer);
+        progressBarContainer.appendChild(progressBar);
+
+        progressContainer.appendChild(progressBarContainer);
+        document.getElementById('progressContainer').appendChild(progressContainer);
+
+        xhr.upload.onprogress = function(event) {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            progressBarFill.style.width = percentComplete + '%';
+            progressBarPercent.textContent = percentComplete + '%';
           }
+        };
 
-        } else {
-          console.error('Error uploading file:', xhr.statusText);
-        }
-        document.getElementById('progressContainer').classList.add('hidden');
-        document.getElementById('progressBar').style.width = '0%';
-        document.getElementById('progressText').textContent = '0%';
-        fileInput.value = '';
-      };
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            const filePreview = document.createElement('div');
+            filePreview.className = 'p-2 bg-gray-200 rounded';
 
-      xhr.send(formData);
+            if (file.type.startsWith('image/')) {
+              const img = document.createElement('img');
+              img.src = response.filePath;
+              img.className = 'w-full h-auto rounded';
+              filePreview.appendChild(img);
+            } else if (file.type.startsWith('video/')) {
+              const video = document.createElement('video');
+              video.controls = true;
+              video.className = 'w-full h-auto rounded';
+              const source = document.createElement('source');
+              source.src = response.filePath;
+              source.type = file.type;
+              video.appendChild(source);
+              filePreview.appendChild(video);
+            } else if (file.type.startsWith('audio/')) {
+              const audio = document.createElement('audio');
+              audio.controls = true;
+              audio.className = 'w-full h-auto rounded';
+              const source = document.createElement('source');
+              source.src = response.filePath;
+              source.type = file.type;
+              audio.appendChild(source);
+              filePreview.appendChild(audio);
+            } else {
+              const placeholder = document.createElement('div');
+              placeholder.className = 'flex items-center justify-center h-full w-full bg-gray-300 rounded';
+              const span = document.createElement('span');
+              span.className = 'text-gray-700';
+              span.textContent = 'Preview not available';
+              placeholder.appendChild(span);
+              filePreview.appendChild(placeholder);
+            }
+
+            progressContainer.appendChild(filePreview);
+          } else {
+            console.error('Error uploading file:', xhr.statusText);
+          }
+          progressBarText.textContent = 'Completed';
+        };
+
+        xhr.send(formData);
+      });
+
+      buttonText.classList.remove('hidden');
+      loader.classList.add('hidden');
+      fileInput.value = '';
     });
   </script>
 </body>
