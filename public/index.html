@@ -10,8 +10,10 @@
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
   <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl">
     <h1 class="text-2xl font-bold mb-4">
-        You are <span class="text-red-500" id="youAre"></span>
+      You are <span class="text-red-500" id="youAre"></span>
+      <button id="editDeviceName" class="ml-2 text-blue-500 underline">Edit</button>
     </h1>
+    <h2 class="text-lg font-semibold mb-4">Your IP: <span id="serverIp" class="font-mono"></span></h2>
     <form id="uploadForm" class="flex flex-col space-y-4">
       <input type="file" id="fileInput" name="files" multiple class="border p-2 rounded">
       <label for="deviceSelect" class="mt-2">Select Device:</label>
@@ -30,7 +32,7 @@
     <div id="fileList" class="mt-4"></div>
   </div>
   <script>
-    const socket = io('http://192.168.0.102:3000');
+    const socket = io();
     const deviceSelect = document.getElementById('deviceSelect');
     let currentDeviceId = '';
 
@@ -88,7 +90,7 @@
       currentDeviceOption.disabled = true;
       deviceSelect.appendChild(currentDeviceOption);
 
-      document.getElementById('youAre').innerHTML = `(${currentDeviceOption.textContent})`
+      document.getElementById('youAre').innerHTML = `${currentDeviceOption.textContent}`;
 
       devices.forEach(device => {
         if (device.id !== currentDeviceId) {
@@ -143,6 +145,22 @@
       fileList.appendChild(fileLink);
       fileLink.click();
     }
+
+    document.getElementById('editDeviceName').addEventListener('click', () => {
+      const newDeviceName = prompt("Enter your new device name:", localStorage.getItem('deviceName'));
+      if (newDeviceName) {
+        localStorage.setItem('deviceName', newDeviceName);
+        document.getElementById('youAre').textContent = newDeviceName;
+        socket.emit('registerDevice', newDeviceName);
+      }
+    });
+
+    // Fetch and display server IP
+    fetch('/get-ip')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('serverIp').textContent = data.ip;
+      });
 
     const deviceName = localStorage.getItem('deviceName') || prompt("Enter your device name:");
     localStorage.setItem('deviceName', deviceName);

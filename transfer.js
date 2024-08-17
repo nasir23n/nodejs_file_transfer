@@ -1,16 +1,18 @@
+// Server-side (app.js)
 const express = require('express');
 const multer = require('multer');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
+const { getLANIP } = require('./utils.js');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
 const PORT = 3000;
-
+const IP = getLANIP();
 const devices = {};
 
 const storage = multer.diskStorage({
@@ -30,6 +32,10 @@ const upload = multer({ storage: storage });
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.get('/get-ip', (req, res) => {
+  res.json({ ip: `http://${IP}:${PORT}` });
+});
 
 app.post('/upload', upload.array('files'), (req, res) => {
   const { deviceId } = req.body;
@@ -65,5 +71,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Server running on http://192.168.0.102:${PORT}`);
+  console.log(`Server running on http://${IP}:${PORT}`);
 });
